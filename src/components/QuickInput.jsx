@@ -3,12 +3,13 @@ import { Mic, MicOff, Plus, AlertCircle } from 'lucide-react';
 import { startSpeechRecognition, stopSpeechRecognition, isSpeechSupported } from '../lib/speech';
 import { parseQuickInput } from '../lib/parser';
 import { playAddSound } from '../lib/sound';
+import { todayStr, tomorrowStr } from '../lib/date';
 
 export default function QuickInput({ onAddTask }) {
   const [text, setText] = useState('');
   const [priority, setPriority] = useState('normal');
   const [dueDate, setDueDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    return todayStr();
   });
   const [isListening, setIsListening] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
@@ -91,19 +92,15 @@ export default function QuickInput({ onAddTask }) {
   };
 
   const setToday = () => {
-    setDueDate(new Date().toISOString().split('T')[0]);
+    setDueDate(todayStr());
   };
 
   const setTomorrow = () => {
-    const tmr = new Date();
-    tmr.setDate(tmr.getDate() + 1);
-    setDueDate(tmr.toISOString().split('T')[0]);
+    setDueDate(tomorrowStr());
   };
 
-  const todayIso = new Date().toISOString().split('T')[0];
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowIso = tomorrow.toISOString().split('T')[0];
+  const todayIso = todayStr();
+  const tomorrowIso = tomorrowStr();
 
   return (
     <form className="quick-input" onSubmit={handleSubmit}>

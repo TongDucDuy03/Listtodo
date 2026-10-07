@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Trash2, Pencil } from 'lucide-react';
 import { playDoneSound } from '../lib/sound';
+import { todayStr } from '../lib/date';
 
 const formatShortDate = (iso) => {
   const [, m, d] = iso.split('-');
@@ -11,9 +12,9 @@ export default function TodoItem({ todo, onToggleComplete, onDelete, onUpdateTex
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(todo.text);
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const isToday = todo.due_date === todayStr;
-  const isOverdue = todo.due_date && todo.due_date < todayStr && !todo.completed;
+  const today = todayStr();
+  const isToday = todo.due_date === today;
+  const isOverdue = todo.due_date && todo.due_date < today && !todo.completed;
   const priority = todo.priority || 'normal';
 
   const handleToggle = () => {

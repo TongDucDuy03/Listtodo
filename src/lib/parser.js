@@ -1,3 +1,5 @@
+import { todayStr, tomorrowStr } from './date';
+
 // Smart task text parser for quick capture
 
 export function parseQuickInput(rawText) {
@@ -8,13 +10,6 @@ export function parseQuickInput(rawText) {
   const tags = [];
   let dueDate = '';
 
-  const today = new Date();
-  const formatYMD = (d) => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
 
   // Priority flags
   if (/(!gap|!khancap|!urgent|!1)\b/i.test(text)) {
@@ -37,13 +32,13 @@ export function parseQuickInput(rawText) {
     text = text.replace(/#([\p{L}\w_-]+)/gu, '').trim();
   }
 
-  // Quick date indicators
-  if (/(hôm nay|hom nay|today)/i.test(text)) {
-    dueDate = formatYMD(today);
-  } else if (/(ngày mai|ngay mai|mai|tomorrow)/i.test(text)) {
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    dueDate = formatYMD(tomorrow);
+  // Quick date indicators: chỉ khớp khi là một từ riêng
+  // (\b của JS không hiểu chữ có dấu, nên tự kiểm tra ký tự chữ/số hai bên)
+  // để "email", "maiu" hay "Hôm nayy" không bị hiểu nhầm là ngày.
+  if (/(?<![\p{L}\p{N}])(hôm nay|hom nay|today)(?![\p{L}\p{N}])/iu.test(text)) {
+    dueDate = todayStr();
+  } else if (/(?<![\p{L}\p{N}])(ngày mai|ngay mai|mai|tomorrow)(?![\p{L}\p{N}])/iu.test(text)) {
+    dueDate = tomorrowStr();
   }
 
   // Clean double spaces

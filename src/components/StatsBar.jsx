@@ -1,10 +1,11 @@
 import React from 'react';
+import { todayStr } from '../lib/date';
 
 export default function StatsBar({ todos }) {
-  const todayStr = new Date().toISOString().split('T')[0];
+  const today = todayStr();
 
   // Tasks for today or tasks marked urgent
-  const todayTasks = todos.filter((t) => t.due_date === todayStr || (!t.due_date && !t.completed));
+  const todayTasks = todos.filter((t) => t.due_date === today || (!t.due_date && !t.completed));
   const completedToday = todayTasks.filter((t) => t.completed).length;
   const totalToday = todayTasks.length;
   const percent = totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 100;

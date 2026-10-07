@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../config';
+import { todayStr } from './date';
 
 const STORAGE_KEYS = {
   SYNC_CODE: 'nhanhtodo_sync_code',
@@ -87,13 +88,13 @@ export function saveLocalTodos(todos) {
 }
 
 export function getDefaultSampleTodos() {
-  const todayStr = new Date().toISOString().split('T')[0];
+  const today = todayStr();
   return [
     {
       id: 'demo-1',
       text: 'Thử bấm micro rồi nói một việc cần làm',
       priority: 'urgent',
-      due_date: todayStr,
+      due_date: today,
       completed: false,
       created_at: new Date().toISOString()
     },
@@ -101,7 +102,7 @@ export function getDefaultSampleTodos() {
       id: 'demo-2',
       text: 'Cài app lên điện thoại (xem hướng dẫn trong Cài đặt)',
       priority: 'high',
-      due_date: todayStr,
+      due_date: today,
       completed: false,
       created_at: new Date(Date.now() - 3600000).toISOString()
     },
@@ -109,7 +110,7 @@ export function getDefaultSampleTodos() {
       id: 'demo-3',
       text: 'Đánh dấu xong việc này để gạch nó đi',
       priority: 'normal',
-      due_date: todayStr,
+      due_date: today,
       completed: false,
       created_at: new Date(Date.now() - 7200000).toISOString()
     }

@@ -14,6 +14,7 @@ import {
   readSyncCodeFromUrl
 } from './lib/supabase';
 import { sendLocalNotification } from './lib/notifications';
+import { todayStr } from './lib/date';
 
 // Mở link #sync=... từ thiết bị khác: lưu mã trước khi render lần đầu
 const codeFromLink = typeof window !== 'undefined' ? readSyncCodeFromUrl() : '';
@@ -130,9 +131,9 @@ export default function App() {
   // Anti-forgetting background reminder check (every 5 minutes)
   useEffect(() => {
     const checkReminders = () => {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const today = todayStr();
       const urgentPending = todos.filter(
-        (t) => !t.completed && (t.priority === 'urgent' || t.due_date === todayStr)
+        (t) => !t.completed && (t.priority === 'urgent' || t.due_date === today)
       );
 
       if (urgentPending.length > 0) {
@@ -154,7 +155,7 @@ export default function App() {
       sync_code: config.syncCode,
       text: newTaskData.text,
       priority: newTaskData.priority || 'normal',
-      due_date: newTaskData.due_date || new Date().toISOString().split('T')[0],
+      due_date: newTaskData.due_date || todayStr(),
       tags: newTaskData.tags || [],
       completed: false,
       created_at: new Date().toISOString()
@@ -223,17 +224,17 @@ export default function App() {
     }
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const today = todayStr();
 
   // Counts for tabs
   const counts = useMemo(() => {
     return {
-      today: todos.filter((t) => !t.completed && (t.due_date === todayStr || !t.due_date)).length,
+      today: todos.filter((t) => !t.completed && (t.due_date === today || !t.due_date)).length,
       urgent: todos.filter((t) => !t.completed && t.priority === 'urgent').length,
       all: todos.filter((t) => !t.completed).length,
       completed: todos.filter((t) => t.completed).length
     };
-  }, [todos, todayStr]);
+  }, [todos, today]);
 
   // Filtered todos based on active tab & search query
   const filteredTodos = useMemo(() => {
@@ -248,7 +249,7 @@ export default function App() {
 
       // Tab filter
       if (activeFilter === 'today') {
-        return !todo.completed && (todo.due_date === todayStr || !todo.due_date);
+        return !todo.completed && (todo.due_date === today || !todo.due_date);
       }
       if (activeFilter === 'urgent') {
         return !todo.completed && todo.priority === 'urgent';
@@ -259,7 +260,7 @@ export default function App() {
       // 'all' tab shows all uncompleted tasks
       return !todo.completed;
     });
-  }, [todos, activeFilter, searchQuery, todayStr]);
+  }, [todos, activeFilter, searchQuery, today]);
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
