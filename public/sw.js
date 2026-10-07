@@ -1,9 +1,9 @@
-const CACHE_NAME = 'nhanhtodo-v1';
+const CACHE_NAME = 'nhanhtodo-v2';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/favicon.svg'
+  './',
+  './index.html',
+  './manifest.json',
+  './favicon.svg'
 ];
 
 self.addEventListener('install', (event) => {
