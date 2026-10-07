@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS todos (
   text TEXT NOT NULL,
   priority TEXT DEFAULT 'normal',
   due_date TEXT,
+  tags TEXT[] DEFAULT '{}',
   reminder_time TEXT,
   completed BOOLEAN DEFAULT false,
   completed_at TIMESTAMPTZ,
