@@ -1,20 +1,18 @@
 import React, { useState } from 'react';
 import { X, Copy, Check, Download, Upload } from 'lucide-react';
-import { SUPABASE_SQL_SETUP, saveConfig, getSavedConfig } from '../lib/supabase';
-import { requestNotificationPermission, isNotificationSupported } from '../lib/notifications';
+import { getShareLink } from '../lib/supabase';
+import { requestNotificationPermission } from '../lib/notifications';
 
 export default function SettingsModal({
   isOpen,
   onClose,
-  onConfigSaved,
+  syncCode,
+  onChangeCode,
   todos,
   onImportTodos
 }) {
-  const currentConfig = getSavedConfig();
-  const [url, setUrl] = useState(currentConfig.url);
-  const [key, setKey] = useState(currentConfig.key);
-  const [syncCode, setSyncCode] = useState(currentConfig.syncCode);
-  const [copiedSql, setCopiedSql] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [newCode, setNewCode] = useState('');
   const [notificationStatus, setNotificationStatus] = useState(
     typeof window !== 'undefined' && 'Notification' in window
       ? Notification.permission
@@ -23,17 +21,25 @@ export default function SettingsModal({
 
   if (!isOpen) return null;
 
-  const handleSave = (e) => {
-    e.preventDefault();
-    saveConfig({ url, key, syncCode });
-    onConfigSaved({ url, key, syncCode });
-    onClose();
+  const shareLink = getShareLink(syncCode);
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    } catch {
+      window.prompt('Chép link này và mở trên thiết bị khác:', shareLink);
+    }
   };
 
-  const handleCopySql = () => {
-    navigator.clipboard.writeText(SUPABASE_SQL_SETUP);
-    setCopiedSql(true);
-    setTimeout(() => setCopiedSql(false), 2500);
+  const handleSwitchCode = (e) => {
+    e.preventDefault();
+    const trimmed = newCode.trim().toLowerCase();
+    if (!trimmed || trimmed === syncCode) return;
+    onChangeCode(trimmed);
+    setNewCode('');
+    onClose();
   };
 
   const handleRequestNotification = async () => {
@@ -63,7 +69,7 @@ export default function SettingsModal({
           onImportTodos(imported);
           alert(`Đã khôi phục ${imported.length} việc.`);
         }
-      } catch (err) {
+      } catch {
         alert('Không đọc được file. Hãy chọn file .json được tải từ NhanhTodo.');
       }
     };
@@ -86,69 +92,38 @@ export default function SettingsModal({
           </button>
         </div>
 
-        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="sync-code">Mã đồng bộ</label>
-            <input
-              id="sync-code"
-              type="text"
-              className="form-input"
-              value={syncCode}
-              onChange={(e) => setSyncCode(e.target.value)}
-              placeholder="vd: nha-minh hoặc 9999"
-              required
-            />
-            <span className="form-hint">
-              Nhập cùng một mã trên điện thoại và máy tính để thấy chung danh sách việc.
-            </span>
-          </div>
+        <div className="form-group">
+          <span className="form-label">Mã danh sách của bạn</span>
+          <code className="code-display">{syncCode}</code>
+          <span className="form-hint">
+            Ai có mã này sẽ xem và sửa được danh sách, nên chỉ mở link trên máy của chính bạn.
+          </span>
+        </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="sb-url">Supabase URL</label>
-            <input
-              id="sb-url"
-              type="text"
-              className="form-input"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://xyzcompany.supabase.co"
-            />
-          </div>
+        <button type="button" className="btn-primary" onClick={handleCopyLink}>
+          {copiedLink ? <Check size={14} /> : <Copy size={14} />}
+          {copiedLink ? 'Đã chép link' : 'Chép link cho thiết bị khác'}
+        </button>
+        <span className="form-hint" style={{ marginTop: -10 }}>
+          Gửi link cho chính bạn (Zalo, email…) rồi mở trên điện thoại. Danh sách sẽ tự hiện, không cần
+          nhập gì.
+        </span>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="sb-key">Supabase anon key</label>
-            <input
-              id="sb-key"
-              type="password"
-              className="form-input"
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
-            />
-            <span className="form-hint">
-              Để trống nếu chỉ dùng trên một máy. Dữ liệu sẽ lưu ngay trong trình duyệt.
-            </span>
-          </div>
-
-          {url && (
-            <div className="form-group">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className="form-label">Lệnh SQL tạo bảng</span>
-                <button type="button" className="link-btn" onClick={handleCopySql}>
-                  {copiedSql ? <Check size={12} /> : <Copy size={12} />}
-                  {copiedSql ? 'Đã chép' : 'Chép SQL'}
-                </button>
-              </div>
-              <pre className="code-box">{SUPABASE_SQL_SETUP}</pre>
-            </div>
-          )}
-
+        <form className="modal-section" onSubmit={handleSwitchCode}>
+          <label className="form-label" htmlFor="switch-code">Chuyển sang mã khác</label>
           <div className="btn-row">
-            <button type="submit" className="btn-primary" style={{ flex: 1 }}>
-              Lưu cài đặt
-            </button>
-            <button type="button" className="btn-secondary" onClick={onClose}>
-              Hủy
+            <input
+              id="switch-code"
+              className="form-input"
+              style={{ flex: 1, minWidth: 0 }}
+              value={newCode}
+              onChange={(e) => setNewCode(e.target.value)}
+              placeholder="vd: abcd-efgh-jkmn"
+              autoComplete="off"
+              autoCapitalize="none"
+            />
+            <button type="submit" className="btn-secondary" disabled={!newCode.trim()}>
+              Chuyển
             </button>
           </div>
         </form>

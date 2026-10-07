@@ -27,11 +27,11 @@ export default function Header({
             className={`sync-status ${isCloudConnected ? 'cloud' : 'local'}`}
             title={
               isCloudConnected
-                ? `Đang đồng bộ với mã: ${syncCode}`
-                : 'Chỉ lưu trên máy này. Mở cài đặt để đồng bộ điện thoại và máy tính.'
+                ? 'Danh sách đã được lưu lên mạng và dùng chung trên các thiết bị'
+                : `Không kết nối được máy chủ. Việc mới vẫn lưu trên máy này (mã ${syncCode}).`
             }
           >
-            {isCloudConnected ? `Đồng bộ: ${syncCode}` : 'Lưu trên máy'}
+            {isCloudConnected ? 'Đã đồng bộ' : 'Chưa đồng bộ'}
           </span>
         </div>
 

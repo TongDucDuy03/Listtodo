@@ -4,14 +4,20 @@ import QuickInput from './components/QuickInput';
 import FilterTabs from './components/FilterTabs';
 import TodoItem from './components/TodoItem';
 import SettingsModal from './components/SettingsModal';
+import Welcome from './components/Welcome';
 import {
   getSupabaseClient,
   getSavedConfig,
   getLocalTodos,
-  saveLocalTodos
+  saveLocalTodos,
+  saveSyncCode,
+  readSyncCodeFromUrl
 } from './lib/supabase';
 import { sendLocalNotification } from './lib/notifications';
-import { playAlertSound } from './lib/sound';
+
+// Mở link #sync=... từ thiết bị khác: lưu mã trước khi render lần đầu
+const codeFromLink = typeof window !== 'undefined' ? readSyncCodeFromUrl() : '';
+if (codeFromLink) saveSyncCode(codeFromLink);
 
 export default function App() {
   const [todos, setTodos] = useState(() => getLocalTodos());
@@ -79,32 +85,42 @@ export default function App() {
     }
   }, [config.syncCode]);
 
+  // Realtime không mang theo header x-sync-code nên RLS sẽ chặn sự kiện;
+  // thay vào đó tải lại khi quay lại app và mỗi 20 giây khi app đang mở.
   useEffect(() => {
+    if (!config.syncCode) return;
     loadSupabaseTodos();
 
-    const client = getSupabaseClient();
-    if (!client) return;
-
-    // Realtime subscription for cross-device live updates
-    const channel = client
-      .channel('todos-sync-channel')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'todos', filter: `sync_code=eq.${config.syncCode}` },
-        () => {
-          loadSupabaseTodos();
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setIsCloudConnected(true);
-        }
-      });
+    const refreshIfVisible = () => {
+      if (document.visibilityState === 'visible') loadSupabaseTodos();
+    };
+    const interval = setInterval(refreshIfVisible, 20 * 1000);
+    document.addEventListener('visibilitychange', refreshIfVisible);
+    window.addEventListener('focus', refreshIfVisible);
 
     return () => {
-      client.removeChannel(channel);
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+      window.removeEventListener('focus', refreshIfVisible);
     };
-  }, [config, loadSupabaseTodos]);
+  }, [config.syncCode, loadSupabaseTodos]);
+
+  // Bắt đầu với một mã: tạo mới thì đẩy việc đang có lên, dùng mã cũ thì tải về
+  const handleStartWithCode = async (syncCode, { isNew }) => {
+    saveSyncCode(syncCode);
+    if (isNew) {
+      const client = getSupabaseClient();
+      const own = todos
+        .filter((t) => !String(t.id).startsWith('demo-'))
+        .map((t) => ({ ...t, sync_code: syncCode }));
+      if (client && own.length > 0) {
+        const { error } = await client.from('todos').upsert(own);
+        if (error) console.error('Failed to upload existing todos:', error);
+      }
+      setTodos(own);
+    }
+    setConfig(getSavedConfig());
+  };
 
   // Save to LocalStorage whenever todos change
   useEffect(() => {
@@ -249,10 +265,20 @@ export default function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  const handleConfigSaved = (newConfig) => {
-    setConfig(newConfig);
-    loadSupabaseTodos();
+  // Khôi phục từ file sao lưu: gắn vào mã hiện tại và đẩy lên cloud
+  const handleImportTodos = async (imported) => {
+    const withCode = imported.map((t) => ({ ...t, sync_code: config.syncCode }));
+    setTodos(withCode);
+    const client = getSupabaseClient();
+    if (client) {
+      const { error } = await client.from('todos').upsert(withCode);
+      if (error) console.error('Failed to upload imported todos:', error);
+    }
   };
+
+  if (!config.syncCode) {
+    return <Welcome onStart={handleStartWithCode} />;
+  }
 
   const emptyCopy = {
     today: ['Hôm nay trống trơn.', 'Ghi việc mới ở dòng trên, hoặc bấm micro để nói.'],
@@ -310,9 +336,10 @@ export default function App() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
-        onConfigSaved={handleConfigSaved}
+        syncCode={config.syncCode}
+        onChangeCode={(code) => handleStartWithCode(code, { isNew: false })}
         todos={todos}
-        onImportTodos={(imported) => setTodos(imported)}
+        onImportTodos={handleImportTodos}
       />
     </div>
   );

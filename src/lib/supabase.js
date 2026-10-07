@@ -1,43 +1,64 @@
 import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_KEY } from '../config';
 
 const STORAGE_KEYS = {
-  SUPABASE_URL: 'nhanhtodo_supabase_url',
-  SUPABASE_KEY: 'nhanhtodo_supabase_key',
   SYNC_CODE: 'nhanhtodo_sync_code',
   LOCAL_TODOS: 'nhanhtodo_local_todos'
 };
 
-// Get stored configurations
+// URL và publishable key được gắn sẵn trong src/config.js,
+// mỗi thiết bị chỉ cần nhớ mã danh sách (sync code).
 export function getSavedConfig() {
-  if (typeof window === 'undefined') return { url: '', key: '', syncCode: 'my-todo' };
+  if (typeof window === 'undefined') return { url: SUPABASE_URL, key: SUPABASE_KEY, syncCode: '' };
   return {
-    url: localStorage.getItem(STORAGE_KEYS.SUPABASE_URL) || '',
-    key: localStorage.getItem(STORAGE_KEYS.SUPABASE_KEY) || '',
-    syncCode: localStorage.getItem(STORAGE_KEYS.SYNC_CODE) || 'my-todo'
+    url: SUPABASE_URL,
+    key: SUPABASE_KEY,
+    syncCode: localStorage.getItem(STORAGE_KEYS.SYNC_CODE) || ''
   };
 }
 
-export function saveConfig({ url, key, syncCode }) {
-  if (typeof window === 'undefined') return;
-  if (url !== undefined) localStorage.setItem(STORAGE_KEYS.SUPABASE_URL, url.trim());
-  if (key !== undefined) localStorage.setItem(STORAGE_KEYS.SUPABASE_KEY, key.trim());
-  if (syncCode !== undefined) localStorage.setItem(STORAGE_KEYS.SYNC_CODE, syncCode.trim() || 'my-todo');
+export function saveSyncCode(syncCode) {
+  localStorage.setItem(STORAGE_KEYS.SYNC_CODE, syncCode.trim());
+}
+
+// Mã ngẫu nhiên dạng abcd-efgh-jkmn (bỏ các ký tự dễ nhầm như 0/o, 1/l/i)
+export function generateSyncCode() {
+  const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  const chars = Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
+  return `${chars.slice(0, 4)}-${chars.slice(4, 8)}-${chars.slice(8, 12)}`;
+}
+
+// Link mở trên thiết bị khác sẽ tự lưu mã (phần #... không gửi lên server)
+export function getShareLink(syncCode) {
+  return `${window.location.origin}${import.meta.env.BASE_URL}#sync=${encodeURIComponent(syncCode)}`;
+}
+
+export function readSyncCodeFromUrl() {
+  const match = window.location.hash.match(/sync=([^&]+)/);
+  if (!match) return '';
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+  return decodeURIComponent(match[1]).trim();
 }
 
 let supabaseInstance = null;
 let currentConfigHash = '';
 
 export function getSupabaseClient() {
-  const { url, key } = getSavedConfig();
-  if (!url || !key) return null;
+  const { url, key, syncCode } = getSavedConfig();
+  if (!url || !key || !syncCode) return null;
 
-  const hash = `${url}_${key}`;
+  const hash = `${url}_${key}_${syncCode}`;
   if (supabaseInstance && currentConfigHash === hash) {
     return supabaseInstance;
   }
 
   try {
-    supabaseInstance = createClient(url, key);
+    // Header x-sync-code được RLS kiểm tra: chỉ đọc/ghi được việc của đúng mã này
+    supabaseInstance = createClient(url, key, {
+      global: { headers: { 'x-sync-code': syncCode } },
+      auth: { persistSession: false }
+    });
     currentConfigHash = hash;
     return supabaseInstance;
   } catch (err) {
@@ -94,27 +115,3 @@ export function getDefaultSampleTodos() {
     }
   ];
 }
-
-export const SUPABASE_SQL_SETUP = `-- Copy và chạy đoạn mã này trong SQL Editor của Supabase:
-CREATE TABLE IF NOT EXISTS todos (
-  id TEXT PRIMARY KEY,
-  sync_code TEXT NOT NULL DEFAULT 'my-todo',
-  text TEXT NOT NULL,
-  priority TEXT DEFAULT 'normal',
-  due_date TEXT,
-  tags TEXT[] DEFAULT '{}',
-  reminder_time TEXT,
-  completed BOOLEAN DEFAULT false,
-  completed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Bật phân quyền truy cập
-ALTER TABLE todos ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public access" ON todos;
-CREATE POLICY "Public access" ON todos FOR ALL USING (true) WITH CHECK (true);
-
--- Bật tính năng đồng bộ thời gian thực Realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE todos;
-`;
